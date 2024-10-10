@@ -1,45 +1,25 @@
-﻿using Microsoft.ML;
-using Microsoft.ML.Data;
-using Microsoft.ML.Models;
-using Microsoft.ML.Trainers;
-using Microsoft.ML.Transforms;
+﻿using System;
+using Microsoft.ML;
 using MLNetShared;
-using System;
-using System.Linq;
 
-namespace CrossValidation
+namespace LoadModel
 {
     class Program
     {
+        private static int YEARS_EXPERIENCE = 8;
+
         static void Main(string[] args)
         {
-            var dataset = MLNetUtilities.GetDataPathByDatasetName("SalaryData.csv");
-            var testDataset = MLNetUtilities.GetDataPathByDatasetName("SalaryData-test.csv");
+            var modelPath = MLNetUtilities.GetModelFilePath("model.zip");
 
-            var pipeline = new LearningPipeline
-            {
-                new TextLoader(dataset).CreateFrom<SalaryData>(useHeader: true, separator: ','),
-                new ColumnConcatenator("Features", "YearsExperience"),
-                new GeneralizedAdditiveModelRegressor()
-            };
+            var model = PredictionModel.ReadAsync<SalaryData, SalaryPrediction>(modelPath).Result;
 
-            var crossValidator = new CrossValidator()
-            {
-                Kind = MacroUtilsTrainerKinds.SignatureRegressorTrainer,
-                NumFolds = 5
-            };
-            var crossValidatorOutput = crossValidator.CrossValidate<SalaryData, SalaryPrediction>(pipeline);
+            var prediction = model.Predict(new SalaryData { YearsExperience = YEARS_EXPERIENCE });
 
-            Console.Write(Environment.NewLine);
-            Console.WriteLine("Root Mean Squared for each fold:");
-            crossValidatorOutput.RegressionMetrics.ForEach(m => Console.WriteLine(m.Rms));
+            Console.WriteLine($"Prediction for {YEARS_EXPERIENCE} years - {prediction.PredictedSalary}");
 
-            var totalR2 = crossValidatorOutput.RegressionMetrics.Sum(metric => metric.RSquared);
-            var totalRMS = crossValidatorOutput.RegressionMetrics.Sum(metric => metric.Rms);
-
-            Console.Write(Environment.NewLine);
-            Console.WriteLine($"Average R^2: {totalR2 / crossValidatorOutput.RegressionMetrics.Count}");
-            Console.WriteLine($"Average RMS: {totalRMS / crossValidatorOutput.RegressionMetrics.Count}");
+            // Can write it back to the file system
+            // model.WriteAsync("model.zip");
 
             Console.ReadLine();
         }
